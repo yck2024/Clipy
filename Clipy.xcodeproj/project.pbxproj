@@ -143,6 +143,7 @@
 		4616F201A59E2F39B65EFA18 /* SnippetSyncFileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64BED8807272A289D4348F3A /* SnippetSyncFileTests.swift */; };
 		198220CD6AD7AACACAFD42E6 /* SnippetSyncFileStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A28316BAC87AC3B533CAA1F4 /* SnippetSyncFileStoreTests.swift */; };
 		40DE53EF2F1380C17717EDD7 /* SnippetSyncMergerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFC7F5AED5FD7A88343F0FAB /* SnippetSyncMergerTests.swift */; };
+		A1D06B9A8B1246AAB5A9A001 /* SnippetSyncIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D06B9A8B1246AAB5A9A002 /* SnippetSyncIntegrationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -286,6 +287,7 @@
 		64BED8807272A289D4348F3A /* SnippetSyncFileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SnippetSyncFileTests.swift"; sourceTree = "<group>"; };
 		A28316BAC87AC3B533CAA1F4 /* SnippetSyncFileStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SnippetSyncFileStoreTests.swift"; sourceTree = "<group>"; };
 		BFC7F5AED5FD7A88343F0FAB /* SnippetSyncMergerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SnippetSyncMergerTests.swift"; sourceTree = "<group>"; };
+		A1D06B9A8B1246AAB5A9A002 /* SnippetSyncIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SnippetSyncIntegrationTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -848,6 +850,7 @@
 			children = (
 				A28316BAC87AC3B533CAA1F4 /* SnippetSyncFileStoreTests.swift */,
 				BFC7F5AED5FD7A88343F0FAB /* SnippetSyncMergerTests.swift */,
+				A1D06B9A8B1246AAB5A9A002 /* SnippetSyncIntegrationTests.swift */,
 			);
 			path = SnippetSync;
 			sourceTree = "<group>";
@@ -1122,6 +1125,7 @@
 				4616F201A59E2F39B65EFA18 /* SnippetSyncFileTests.swift in Sources */,
 				198220CD6AD7AACACAFD42E6 /* SnippetSyncFileStoreTests.swift in Sources */,
 				40DE53EF2F1380C17717EDD7 /* SnippetSyncMergerTests.swift in Sources */,
+				A1D06B9A8B1246AAB5A9A001 /* SnippetSyncIntegrationTests.swift in Sources */,
 				C50D1A013021000100000001 /* MonospacedDigitFormatterTests.swift in Sources */,
 				C52D2133301DB500009D832A /* AppMigratorTests.swift in Sources */,
 				C5700B502FD106000C8F965 /* DatabaseMigrationTests.swift in Sources */,

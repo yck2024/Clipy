@@ -25,7 +25,8 @@ final class SnippetSyncService {
     @Dependency(\.mainQueue)
     private var mainQueue
 
-    private let fileStore = SnippetSyncFileStore()
+    private let fileStore: SnippetSyncFileStore
+
     private var filePresenter: SnippetSyncFilePresenter?
     private var configurationCancellable: AnyCancellable?
     private var localObservationCancellable: AnyCancellable?
@@ -40,6 +41,15 @@ final class SnippetSyncService {
     private var isSnippetSyncEnabled
     @Shared(.snippetSyncFolderPath)
     private var snippetSyncFolderPath
+
+    init(fileStore: SnippetSyncFileStore = SnippetSyncFileStore()) {
+        self.fileStore = fileStore
+    }
+
+    func synchronizeForTesting(at folderURL: URL) {
+        currentFolderURL = folderURL
+        syncNow()
+    }
 
     func start() {
         syncTriggerCancellable = syncTrigger
@@ -102,6 +112,10 @@ private extension SnippetSyncService {
 
     func syncNow() {
         guard let folderURL = currentFolderURL else { return }
+        synchronize(at: folderURL)
+    }
+
+    func synchronize(at folderURL: URL) {
         let url = syncFileURL(in: folderURL)
 
         let details = snippetRepository.fetchFolderDetails()
