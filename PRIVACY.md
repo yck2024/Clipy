@@ -20,9 +20,7 @@ performs.
   `clipy-app.com` and diagnostics/usage measurement via Firebase.
 - Firebase Analytics / Firebase Crashlytics are enabled by default and can be
   disabled in Clipy's Preferences.
-- Snippet folder sync is an opt-in feature, off by default. When enabled, it
-  writes your snippets and snippet folders to a JSON file in a local folder
-  you choose, such as iCloud Drive. Clipboard history is never included.
+- Optional snippet folder sync is off by default; see [Snippet Folder Sync](#snippet-folder-sync-optional).
 
 ## Data Stored Locally
 
