@@ -29,8 +29,7 @@ struct SnippetSyncMergerTests {
         let plan = SnippetSyncMerger.plan(
             localFolders: [localFolder],
             localSnippets: [localSnippet],
-            previousLocalFolders: nil,
-            previousLocalSnippets: nil,
+            previousLocal: SnippetSyncBaseline(folders: nil, snippets: nil),
             remote: .success(SnippetSyncFile(folders: [remoteFolder], snippets: [], deletedFolders: [], deletedSnippets: [])),
             now: 1_000
         )
@@ -56,16 +55,14 @@ struct SnippetSyncMergerTests {
         let forward = SnippetSyncMerger.plan(
             localFolders: [first, second],
             localSnippets: [],
-            previousLocalFolders: nil,
-            previousLocalSnippets: nil,
+            previousLocal: SnippetSyncBaseline(folders: nil, snippets: nil),
             remote: .notFound,
             now: 1_000
         )
         let backward = SnippetSyncMerger.plan(
             localFolders: [second, first],
             localSnippets: [],
-            previousLocalFolders: nil,
-            previousLocalSnippets: nil,
+            previousLocal: SnippetSyncBaseline(folders: nil, snippets: nil),
             remote: .notFound,
             now: 1_000
         )
@@ -81,8 +78,7 @@ struct SnippetSyncMergerTests {
         let plan = SnippetSyncMerger.plan(
             localFolders: [localFolder],
             localSnippets: [],
-            previousLocalFolders: nil,
-            previousLocalSnippets: nil,
+            previousLocal: SnippetSyncBaseline(folders: nil, snippets: nil),
             remote: .notFound,
             now: 1_000
         )
@@ -101,12 +97,12 @@ struct SnippetSyncMergerTests {
 
         let mergeOnA = SnippetSyncMerger.plan(
             localFolders: [deviceA], localSnippets: [],
-            previousLocalFolders: [deviceA], previousLocalSnippets: [],
+            previousLocal: SnippetSyncBaseline(folders: [deviceA], snippets: []),
             remote: .success(fileFromB), now: 1_000
         )
         let mergeOnB = SnippetSyncMerger.plan(
             localFolders: [deviceB], localSnippets: [],
-            previousLocalFolders: [deviceB], previousLocalSnippets: [],
+            previousLocal: SnippetSyncBaseline(folders: [deviceB], snippets: []),
             remote: .success(fileFromA), now: 1_000
         )
 
@@ -120,7 +116,7 @@ struct SnippetSyncMergerTests {
         let snippetB = snippet(id: snippetID, folderID: folderID, title: "Beta", updatedAt: 100)
         let snippetMergeOnA = SnippetSyncMerger.plan(
             localFolders: [folder(id: folderID, title: "Folder", updatedAt: 100)], localSnippets: [snippetA],
-            previousLocalFolders: nil, previousLocalSnippets: [snippetA],
+            previousLocal: SnippetSyncBaseline(folders: nil, snippets: [snippetA]),
             remote: .success(SnippetSyncFile(
                 folders: [folderRecord(id: folderID.rawValue, title: "Folder", updatedAt: 100)],
                 snippets: [SnippetSyncSnippetRecord(snippetB)], deletedFolders: [], deletedSnippets: []
@@ -128,7 +124,7 @@ struct SnippetSyncMergerTests {
         )
         let snippetMergeOnB = SnippetSyncMerger.plan(
             localFolders: [folder(id: folderID, title: "Folder", updatedAt: 100)], localSnippets: [snippetB],
-            previousLocalFolders: nil, previousLocalSnippets: [snippetB],
+            previousLocal: SnippetSyncBaseline(folders: nil, snippets: [snippetB]),
             remote: .success(SnippetSyncFile(
                 folders: [folderRecord(id: folderID.rawValue, title: "Folder", updatedAt: 100)],
                 snippets: [SnippetSyncSnippetRecord(snippetA)], deletedFolders: [], deletedSnippets: []
@@ -154,13 +150,13 @@ struct SnippetSyncMergerTests {
 
         let firstSide = SnippetSyncMerger.plan(
             localFolders: [SnippetFolder(first)], localSnippets: [],
-            previousLocalFolders: [SnippetFolder(first)], previousLocalSnippets: [],
+            previousLocal: SnippetSyncBaseline(folders: [SnippetFolder(first)], snippets: []),
             remote: .success(SnippetSyncFile(folders: [second], snippets: [], deletedFolders: [], deletedSnippets: [])),
             now: 1_000
         )
         let secondSide = SnippetSyncMerger.plan(
             localFolders: [SnippetFolder(second)], localSnippets: [],
-            previousLocalFolders: [SnippetFolder(second)], previousLocalSnippets: [],
+            previousLocal: SnippetSyncBaseline(folders: [SnippetFolder(second)], snippets: []),
             remote: .success(SnippetSyncFile(folders: [first], snippets: [], deletedFolders: [], deletedSnippets: [])),
             now: 1_000
         )
@@ -202,7 +198,7 @@ struct SnippetSyncMergerTests {
 
         let plan = SnippetSyncMerger.plan(
             localFolders: [localOld, localNew], localSnippets: [localSnippetOld, localSnippetNew],
-            previousLocalFolders: [localOld, localNew], previousLocalSnippets: [localSnippetOld, localSnippetNew],
+            previousLocal: SnippetSyncBaseline(folders: [localOld, localNew], snippets: [localSnippetOld, localSnippetNew]),
             remote: .success(duplicateFile), now: 1_000
         )
 
@@ -219,7 +215,7 @@ struct SnippetSyncMergerTests {
         let tombstone = SnippetSyncTombstone(id: folderID.rawValue, deletedAt: 100)
         let plan = SnippetSyncMerger.plan(
             localFolders: [localFolder], localSnippets: [],
-            previousLocalFolders: [localFolder], previousLocalSnippets: [],
+            previousLocal: SnippetSyncBaseline(folders: [localFolder], snippets: []),
             remote: .success(SnippetSyncFile(folders: [], snippets: [], deletedFolders: [tombstone], deletedSnippets: [])),
             now: 1_000
         )
@@ -237,8 +233,7 @@ struct SnippetSyncMergerTests {
         let plan = SnippetSyncMerger.plan(
             localFolders: [localFolder],
             localSnippets: [],
-            previousLocalFolders: [localFolder],
-            previousLocalSnippets: [],
+            previousLocal: SnippetSyncBaseline(folders: [localFolder], snippets: []),
             remote: .success(SnippetSyncFile(folders: [remoteFolder], snippets: [], deletedFolders: [], deletedSnippets: [])),
             now: 1_000
         )
@@ -256,8 +251,7 @@ struct SnippetSyncMergerTests {
         let plan = SnippetSyncMerger.plan(
             localFolders: [localFolder],
             localSnippets: [],
-            previousLocalFolders: [localFolder],
-            previousLocalSnippets: [],
+            previousLocal: SnippetSyncBaseline(folders: [localFolder], snippets: []),
             remote: .success(SnippetSyncFile(folders: [remoteFolder], snippets: [], deletedFolders: [], deletedSnippets: [])),
             now: 1_000
         )
@@ -277,8 +271,7 @@ struct SnippetSyncMergerTests {
         let plan = SnippetSyncMerger.plan(
             localFolders: [localFolder],
             localSnippets: [localSnippet],
-            previousLocalFolders: [localFolder],
-            previousLocalSnippets: [localSnippet],
+            previousLocal: SnippetSyncBaseline(folders: [localFolder], snippets: [localSnippet]),
             remote: .success(SnippetSyncFile(folders: [], snippets: [], deletedFolders: [tombstone], deletedSnippets: [])),
             now: 1_000
         )
@@ -302,8 +295,7 @@ struct SnippetSyncMergerTests {
         let plan = SnippetSyncMerger.plan(
             localFolders: [localFolder],
             localSnippets: [],
-            previousLocalFolders: [localFolder],
-            previousLocalSnippets: [],
+            previousLocal: SnippetSyncBaseline(folders: [localFolder], snippets: []),
             remote: .success(SnippetSyncFile(folders: [], snippets: [], deletedFolders: [tombstone], deletedSnippets: [])),
             now: 1_000
         )
@@ -320,8 +312,7 @@ struct SnippetSyncMergerTests {
         let plan = SnippetSyncMerger.plan(
             localFolders: [],
             localSnippets: [],
-            previousLocalFolders: [folder(id: folderID, title: "Folder", updatedAt: 100)],
-            previousLocalSnippets: [],
+            previousLocal: SnippetSyncBaseline(folders: [folder(id: folderID, title: "Folder", updatedAt: 100)], snippets: []),
             remote: .success(SnippetSyncFile(folders: [remoteFolder], snippets: [], deletedFolders: [], deletedSnippets: [])),
             now: 1_000
         )
@@ -342,8 +333,7 @@ struct SnippetSyncMergerTests {
         let plan = SnippetSyncMerger.plan(
             localFolders: [localFolder],
             localSnippets: [localSnippet],
-            previousLocalFolders: [localFolder],
-            previousLocalSnippets: [localSnippet],
+            previousLocal: SnippetSyncBaseline(folders: [localFolder], snippets: [localSnippet]),
             remote: .unreadable,
             now: 1_000
         )

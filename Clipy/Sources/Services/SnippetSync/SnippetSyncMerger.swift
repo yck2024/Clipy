@@ -36,23 +36,25 @@ struct SnippetSyncPlan: Equatable {
     }
 }
 
+struct SnippetSyncBaseline {
+    var folders: [SnippetFolder]?
+    var snippets: [Snippet]?
+}
+
 enum SnippetSyncMerger {
     /// Merges the current local snippet state with the shared sync file.
     ///
     /// - Parameters:
     ///   - localFolders: The folders currently in the local database.
     ///   - localSnippets: The snippets currently in the local database.
-    ///   - previousLocalFolders: The folder ids/timestamps this device last wrote to the sync
-    ///     file. `nil` on first enable, when there is no prior baseline to diff against, so a
-    ///     folder missing from `localFolders` is never treated as a deletion.
-    ///   - previousLocalSnippets: Same as `previousLocalFolders`, for snippets.
+    ///   - previousLocal: The folder and snippet records this device last wrote to the sync file.
+    ///     A missing baseline means first enable, so absent records are never treated as deletions.
     ///   - remote: The result of reading the shared sync file.
     ///   - now: The current unix time in milliseconds, used to stamp newly discovered local deletions.
     static func plan(
         localFolders: [SnippetFolder],
         localSnippets: [Snippet],
-        previousLocalFolders: [SnippetFolder]?,
-        previousLocalSnippets: [Snippet]?,
+        previousLocal: SnippetSyncBaseline,
         remote: SnippetSyncRemoteReadResult,
         now: Int
     ) -> SnippetSyncPlan {
@@ -71,7 +73,7 @@ enum SnippetSyncMerger {
 
         let folderResult = mergeEntities(
             local: localFolders.map(SnippetSyncFolderRecord.init),
-            previousLocal: previousLocalFolders.map { $0.map(SnippetSyncFolderRecord.init) },
+            previousLocal: previousLocal.folders.map { $0.map(SnippetSyncFolderRecord.init) },
             remoteRecords: remoteFile.folders,
             remoteTombstones: remoteFile.deletedFolders,
             now: now
@@ -93,7 +95,7 @@ enum SnippetSyncMerger {
 
         let snippetResult = mergeEntities(
             local: localSnippetRecords,
-            previousLocal: previousLocalSnippets.map { $0.map(SnippetSyncSnippetRecord.init) },
+            previousLocal: previousLocal.snippets.map { $0.map(SnippetSyncSnippetRecord.init) },
             remoteRecords: remoteSnippetRecords,
             remoteTombstones: remoteSnippetTombstones,
             now: now

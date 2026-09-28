@@ -126,8 +126,7 @@ private extension SnippetSyncService {
         let plan = SnippetSyncMerger.plan(
             localFolders: localFolders,
             localSnippets: localSnippets,
-            previousLocalFolders: previousLocalFolders,
-            previousLocalSnippets: previousLocalSnippets,
+            previousLocal: SnippetSyncBaseline(folders: previousLocalFolders, snippets: previousLocalSnippets),
             remote: remoteRead,
             now: Int(Date().timeIntervalSince1970 * 1_000)
         )
