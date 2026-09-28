@@ -111,9 +111,10 @@ struct SnippetSyncMergerTests {
         )
 
         #expect(mergeOnA.fileToWrite == mergeOnB.fileToWrite)
-        #expect(mergeOnA.folderUpserts == mergeOnB.folderUpserts)
         #expect(try #require(mergeOnA.fileToWrite).folders.map(\.title) == ["Beta"])
+        #expect(try #require(mergeOnB.fileToWrite).folders.map(\.title) == ["Beta"])
         #expect(mergeOnA.folderUpserts.map(\.title) == ["Beta"])
+        #expect(mergeOnB.folderUpserts.isEmpty)
 
         let snippetA = snippet(id: snippetID, folderID: folderID, title: "Alpha", updatedAt: 100)
         let snippetB = snippet(id: snippetID, folderID: folderID, title: "Beta", updatedAt: 100)
@@ -135,8 +136,10 @@ struct SnippetSyncMergerTests {
         )
 
         #expect(snippetMergeOnA.fileToWrite == snippetMergeOnB.fileToWrite)
-        #expect(snippetMergeOnA.snippetUpserts == snippetMergeOnB.snippetUpserts)
+        #expect(try #require(snippetMergeOnA.fileToWrite).snippets.map(\.title) == ["Beta"])
+        #expect(try #require(snippetMergeOnB.fileToWrite).snippets.map(\.title) == ["Beta"])
         #expect(snippetMergeOnA.snippetUpserts.map(\.title) == ["Beta"])
+        #expect(snippetMergeOnB.snippetUpserts.isEmpty)
     }
 
     @Test
