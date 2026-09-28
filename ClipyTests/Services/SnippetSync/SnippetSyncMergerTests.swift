@@ -93,6 +93,69 @@ struct SnippetSyncMergerTests {
     }
 
     @Test
+    func equalTimestampEditsConvergeAcrossTwoDevices() throws {
+        let deviceA = folder(id: folderID, title: "Alpha", updatedAt: 100)
+        let deviceB = folder(id: folderID, title: "Beta", updatedAt: 100)
+        let fileFromA = SnippetSyncFile(folders: [SnippetSyncFolderRecord(deviceA)], snippets: [], deletedFolders: [], deletedSnippets: [])
+        let fileFromB = SnippetSyncFile(folders: [SnippetSyncFolderRecord(deviceB)], snippets: [], deletedFolders: [], deletedSnippets: [])
+
+        let mergeOnA = SnippetSyncMerger.plan(
+            localFolders: [deviceA], localSnippets: [],
+            previousLocalFolders: [deviceA], previousLocalSnippets: [],
+            remote: .success(fileFromB), now: 1_000
+        )
+        let mergeOnB = SnippetSyncMerger.plan(
+            localFolders: [deviceB], localSnippets: [],
+            previousLocalFolders: [deviceB], previousLocalSnippets: [],
+            remote: .success(fileFromA), now: 1_000
+        )
+
+        #expect(mergeOnA.fileToWrite == mergeOnB.fileToWrite)
+        #expect(mergeOnA.folderUpserts == mergeOnB.folderUpserts)
+        #expect(try #require(mergeOnA.fileToWrite).folders.map(\.title) == ["Beta"])
+        #expect(mergeOnA.folderUpserts.map(\.title) == ["Beta"])
+
+        let snippetA = snippet(id: snippetID, folderID: folderID, title: "Alpha", updatedAt: 100)
+        let snippetB = snippet(id: snippetID, folderID: folderID, title: "Beta", updatedAt: 100)
+        let snippetMergeOnA = SnippetSyncMerger.plan(
+            localFolders: [folder(id: folderID, title: "Folder", updatedAt: 100)], localSnippets: [snippetA],
+            previousLocalFolders: nil, previousLocalSnippets: [snippetA],
+            remote: .success(SnippetSyncFile(
+                folders: [folderRecord(id: folderID.rawValue, title: "Folder", updatedAt: 100)],
+                snippets: [SnippetSyncSnippetRecord(snippetB)], deletedFolders: [], deletedSnippets: []
+            )), now: 1_000
+        )
+        let snippetMergeOnB = SnippetSyncMerger.plan(
+            localFolders: [folder(id: folderID, title: "Folder", updatedAt: 100)], localSnippets: [snippetB],
+            previousLocalFolders: nil, previousLocalSnippets: [snippetB],
+            remote: .success(SnippetSyncFile(
+                folders: [folderRecord(id: folderID.rawValue, title: "Folder", updatedAt: 100)],
+                snippets: [SnippetSyncSnippetRecord(snippetA)], deletedFolders: [], deletedSnippets: []
+            )), now: 1_000
+        )
+
+        #expect(snippetMergeOnA.fileToWrite == snippetMergeOnB.fileToWrite)
+        #expect(snippetMergeOnA.snippetUpserts == snippetMergeOnB.snippetUpserts)
+        #expect(snippetMergeOnA.snippetUpserts.map(\.title) == ["Beta"])
+    }
+
+    @Test
+    func equalTimestampLiveRecordWinsOverTombstone() throws {
+        let localFolder = folder(id: folderID, title: "Live", updatedAt: 100)
+        let tombstone = SnippetSyncTombstone(id: folderID.rawValue, deletedAt: 100)
+        let plan = SnippetSyncMerger.plan(
+            localFolders: [localFolder], localSnippets: [],
+            previousLocalFolders: [localFolder], previousLocalSnippets: [],
+            remote: .success(SnippetSyncFile(folders: [], snippets: [], deletedFolders: [tombstone], deletedSnippets: [])),
+            now: 1_000
+        )
+
+        #expect(plan.folderDeletions.isEmpty)
+        #expect(try #require(plan.fileToWrite).folders == [SnippetSyncFolderRecord(localFolder)])
+        #expect(try #require(plan.fileToWrite).deletedFolders.isEmpty)
+    }
+
+    @Test
     func conflictingEditsAreResolvedByNewestUpdatedAt() throws {
         let localFolder = folder(id: folderID, title: "Local Title", updatedAt: 100)
         let remoteFolder = folderRecord(id: folderID.rawValue, title: "Remote Title", updatedAt: 200)

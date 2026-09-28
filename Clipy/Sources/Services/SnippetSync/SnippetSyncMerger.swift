@@ -122,10 +122,24 @@ enum SnippetSyncMerger {
 private protocol SnippetSyncEntityRecord: Equatable {
     var id: UUID { get }
     var updatedAt: Int { get }
+    var canonicalContent: String { get }
 }
 
-extension SnippetSyncFolderRecord: SnippetSyncEntityRecord {}
-extension SnippetSyncSnippetRecord: SnippetSyncEntityRecord {}
+extension SnippetSyncFolderRecord: SnippetSyncEntityRecord {
+    var canonicalContent: String {
+        [title, String(index), isEnabled ? "1" : "0"].map(canonicalComponent).joined()
+    }
+}
+
+extension SnippetSyncSnippetRecord: SnippetSyncEntityRecord {
+    var canonicalContent: String {
+        [folderID.uuidString, title, content, String(index), isEnabled ? "1" : "0"].map(canonicalComponent).joined()
+    }
+}
+
+private func canonicalComponent(_ value: String) -> String {
+    "\(value.utf8.count):\(value)"
+}
 
 private struct EntityMergeResult<Record> {
     var records: [Record]
@@ -198,8 +212,15 @@ private func mergeEntities<Record: SnippetSyncEntityRecord>(
         for candidate in candidates.dropFirst() {
             if candidate.timestamp > winner.timestamp {
                 winner = candidate
-            } else if candidate.timestamp == winner.timestamp, winner.isDeleted, !candidate.isDeleted {
-                winner = candidate
+            } else if candidate.timestamp == winner.timestamp {
+                if winner.isDeleted, !candidate.isDeleted {
+                    winner = candidate
+                } else if !winner.isDeleted, !candidate.isDeleted,
+                          let candidateRecord = candidate.record,
+                          let winnerRecord = winner.record,
+                          candidateRecord.canonicalContent > winnerRecord.canonicalContent {
+                    winner = candidate
+                }
             }
         }
 
