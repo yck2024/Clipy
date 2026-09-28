@@ -208,4 +208,48 @@ struct SnippetRepositoryTests {
         #expect(repository.fetchFolderDetail(id: folder.id) == SnippetFolderDetail(folder: folder, snippets: []))
         #expect(repository.fetchSnippet(id: snippet.id) == nil)
     }
+
+    @Test
+    func applySyncChangesUpsertsAndDeletesFoldersAndSnippets() throws {
+        let existingFolder = try #require(repository.insertFolder())
+        let survivingSnippet = try #require(repository.insertSnippet(to: existingFolder.id))
+        let removedFolder = try #require(repository.insertFolder())
+        let removedSnippet = try #require(repository.insertSnippet(to: removedFolder.id))
+
+        let newFolderID = SnippetFolder.ID(rawValue: UUID())
+        let newFolder = SnippetFolder(id: newFolderID, title: "From Sync", index: 2, isEnabled: true, updatedAt: 500)
+        let updatedSurvivingSnippet = Snippet(
+            id: survivingSnippet.id,
+            folderID: existingFolder.id,
+            title: "Updated From Sync",
+            content: survivingSnippet.content,
+            index: survivingSnippet.index,
+            isEnabled: survivingSnippet.isEnabled,
+            updatedAt: 500
+        )
+        let newSnippet = Snippet(
+            id: Snippet.ID(rawValue: UUID()),
+            folderID: newFolderID,
+            title: "New Snippet",
+            content: "content",
+            index: 0,
+            isEnabled: true,
+            updatedAt: 500
+        )
+
+        repository.applySyncChanges(
+            folderUpserts: [newFolder],
+            folderDeletions: [removedFolder.id],
+            snippetUpserts: [updatedSurvivingSnippet, newSnippet],
+            snippetDeletions: []
+        )
+
+        let folderIDs = Set(repository.fetchFolderDetails().map(\.folder.id))
+        #expect(folderIDs == [existingFolder.id, newFolderID])
+        #expect(repository.fetchFolderDetail(id: removedFolder.id) == nil)
+        // Deleting the folder cascades to its snippets even though it wasn't listed explicitly.
+        #expect(repository.fetchSnippet(id: removedSnippet.id) == nil)
+        #expect(repository.fetchSnippet(id: survivingSnippet.id)?.title == "Updated From Sync")
+        #expect(repository.fetchSnippet(id: newSnippet.id)?.title == "New Snippet")
+    }
 }
