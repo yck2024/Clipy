@@ -26,15 +26,7 @@ extension DatabaseMigrator {
             try #sql(
                 """
                 UPDATE "snippetFolders"
-                SET "updatedAt" = unixepoch()
-                """
-            )
-            .execute(database)
-
-            try #sql(
-                """
-                CREATE INDEX "index_snippetFolders_on_updatedAt"
-                ON "snippetFolders" ("updatedAt")
+                SET "updatedAt" = CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)
                 """
             )
             .execute(database)
@@ -50,18 +42,11 @@ extension DatabaseMigrator {
             try #sql(
                 """
                 UPDATE "snippets"
-                SET "updatedAt" = unixepoch()
+                SET "updatedAt" = CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)
                 """
             )
             .execute(database)
 
-            try #sql(
-                """
-                CREATE INDEX "index_snippets_on_updatedAt"
-                ON "snippets" ("updatedAt")
-                """
-            )
-            .execute(database)
         }
     }
 }

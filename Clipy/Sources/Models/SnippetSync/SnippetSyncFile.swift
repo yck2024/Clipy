@@ -24,7 +24,7 @@ struct SnippetSyncFile: Codable, Equatable {
     static let empty = SnippetSyncFile(folders: [], snippets: [], deletedFolders: [], deletedSnippets: [])
 }
 
-/// Records that a folder or snippet with `id` was deleted at `deletedAt` (unix seconds).
+/// Records that a folder or snippet with `id` was deleted at `deletedAt` (unix milliseconds).
 struct SnippetSyncTombstone: Codable, Equatable, Identifiable {
     let id: UUID
     let deletedAt: Int

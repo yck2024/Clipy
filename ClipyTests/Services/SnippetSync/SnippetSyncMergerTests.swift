@@ -140,6 +140,77 @@ struct SnippetSyncMergerTests {
     }
 
     @Test
+    func equalTimestampUnicodeVariantsUseSerializedByteOrder() throws {
+        let firstTitle = "a\u{301}\u{327}"
+        let secondTitle = "a\u{327}\u{301}"
+        let first = folderRecord(id: folderID.rawValue, title: firstTitle, updatedAt: 100)
+        let second = folderRecord(id: folderID.rawValue, title: secondTitle, updatedAt: 100)
+        let expected = try #require([first, second].max {
+            serialized($0).lexicographicallyPrecedes(serialized($1))
+        })
+
+        let firstSide = SnippetSyncMerger.plan(
+            localFolders: [SnippetFolder(first)], localSnippets: [],
+            previousLocalFolders: [SnippetFolder(first)], previousLocalSnippets: [],
+            remote: .success(SnippetSyncFile(folders: [second], snippets: [], deletedFolders: [], deletedSnippets: [])),
+            now: 1_000
+        )
+        let secondSide = SnippetSyncMerger.plan(
+            localFolders: [SnippetFolder(second)], localSnippets: [],
+            previousLocalFolders: [SnippetFolder(second)], previousLocalSnippets: [],
+            remote: .success(SnippetSyncFile(folders: [first], snippets: [], deletedFolders: [], deletedSnippets: [])),
+            now: 1_000
+        )
+
+        #expect(firstTitle == secondTitle)
+        let firstFile = try #require(firstSide.fileToWrite)
+        let secondFile = try #require(secondSide.fileToWrite)
+        #expect(serialized(firstFile) == serialized(secondFile))
+        #expect(serialized(try #require(firstFile.folders.first)) == serialized(expected))
+    }
+
+    @Test
+    func duplicateIDsInDecodedFileAndLocalCollectionsMergeSafely() throws {
+        let json = """
+        {
+          "folders": [
+            { "id": "00000000-0000-0000-0000-000000000001", "title": "Remote old", "index": 0, "isEnabled": true, "updatedAt": 500 },
+            { "id": "00000000-0000-0000-0000-000000000001", "title": "Remote new", "index": 0, "isEnabled": true, "updatedAt": 700 }
+          ],
+          "snippets": [
+            { "id": "00000000-0000-0000-0000-000000000010", "folderID": "00000000-0000-0000-0000-000000000001", "title": "Remote snippet old", "content": "old", "index": 0, "isEnabled": true, "updatedAt": 500 },
+            { "id": "00000000-0000-0000-0000-000000000010", "folderID": "00000000-0000-0000-0000-000000000001", "title": "Remote snippet new", "content": "new", "index": 0, "isEnabled": true, "updatedAt": 700 }
+          ],
+          "deletedFolders": [
+            { "id": "00000000-0000-0000-0000-000000000001", "deletedAt": 600 },
+            { "id": "00000000-0000-0000-0000-000000000001", "deletedAt": 700 }
+          ],
+          "deletedSnippets": [
+            { "id": "00000000-0000-0000-0000-000000000010", "deletedAt": 600 },
+            { "id": "00000000-0000-0000-0000-000000000010", "deletedAt": 700 }
+          ]
+        }
+        """
+        let duplicateFile = try JSONDecoder().decode(SnippetSyncFile.self, from: Data(json.utf8))
+        let localOld = folder(id: folderID, title: "Local old", updatedAt: 400)
+        let localNew = folder(id: folderID, title: "Local new", updatedAt: 450)
+        let localSnippetOld = snippet(id: snippetID, folderID: folderID, title: "Local snippet old", updatedAt: 400)
+        let localSnippetNew = snippet(id: snippetID, folderID: folderID, title: "Local snippet new", updatedAt: 450)
+
+        let plan = SnippetSyncMerger.plan(
+            localFolders: [localOld, localNew], localSnippets: [localSnippetOld, localSnippetNew],
+            previousLocalFolders: [localOld, localNew], previousLocalSnippets: [localSnippetOld, localSnippetNew],
+            remote: .success(duplicateFile), now: 1_000
+        )
+
+        #expect(plan.folderDeletions.isEmpty)
+        #expect(try #require(plan.fileToWrite).folders.map(\.title) == ["Remote new"])
+        #expect(try #require(plan.fileToWrite).snippets.map(\.title) == ["Remote snippet new"])
+        #expect(try #require(plan.fileToWrite).deletedFolders.isEmpty)
+        #expect(try #require(plan.fileToWrite).deletedSnippets.isEmpty)
+    }
+
+    @Test
     func equalTimestampLiveRecordWinsOverTombstone() throws {
         let localFolder = folder(id: folderID, title: "Live", updatedAt: 100)
         let tombstone = SnippetSyncTombstone(id: folderID.rawValue, deletedAt: 100)
@@ -291,5 +362,11 @@ private extension SnippetSyncMergerTests {
 
     func folderRecord(id: UUID, title: String, updatedAt: Int) -> SnippetSyncFolderRecord {
         SnippetSyncFolderRecord(id: id, title: title, index: 0, isEnabled: true, updatedAt: updatedAt)
+    }
+
+    func serialized<T: Encodable>(_ value: T) -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return try! encoder.encode(value)
     }
 }

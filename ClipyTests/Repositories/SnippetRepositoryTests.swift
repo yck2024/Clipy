@@ -64,6 +64,17 @@ struct SnippetRepositoryTests {
     }
 
     @Test
+    func snippetTimestampsUseMilliseconds() throws {
+        let before = Int(Date().timeIntervalSince1970 * 1_000)
+        let folder = try #require(repository.insertFolder())
+        let snippet = try #require(repository.insertSnippet(to: folder.id))
+        let after = Int(Date().timeIntervalSince1970 * 1_000)
+
+        #expect((before...after).contains(folder.updatedAt))
+        #expect((before...after).contains(snippet.updatedAt))
+    }
+
+    @Test
     func insertFoldersAndSnippetsMaintainsOrderedFolderDetails() throws {
         #expect(repository.fetchFolderDetails().isEmpty)
 

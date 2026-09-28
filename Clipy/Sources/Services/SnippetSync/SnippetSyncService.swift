@@ -115,7 +115,7 @@ private extension SnippetSyncService {
             previousLocalFolders: previousLocalFolders,
             previousLocalSnippets: previousLocalSnippets,
             remote: remoteRead,
-            now: Int(Date().timeIntervalSince1970)
+            now: Int(Date().timeIntervalSince1970 * 1_000)
         )
 
         guard let fileToWrite = plan.fileToWrite else {

@@ -326,7 +326,7 @@ final class SnippetRepository: SnippetRepositoryProtocol {
 
 private extension SnippetRepository {
     static func now() -> Int {
-        Int(Date().timeIntervalSince1970)
+        Int(Date().timeIntervalSince1970 * 1_000)
     }
 
     static func folderDetails(folders: [SnippetFolder], snippets: [Snippet]) -> [SnippetFolderDetail] {

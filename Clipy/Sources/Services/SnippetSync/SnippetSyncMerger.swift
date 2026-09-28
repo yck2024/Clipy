@@ -47,7 +47,7 @@ enum SnippetSyncMerger {
     ///     folder missing from `localFolders` is never treated as a deletion.
     ///   - previousLocalSnippets: Same as `previousLocalFolders`, for snippets.
     ///   - remote: The result of reading the shared sync file.
-    ///   - now: The current unix time, used to stamp newly discovered local deletions.
+    ///   - now: The current unix time in milliseconds, used to stamp newly discovered local deletions.
     static func plan(
         localFolders: [SnippetFolder],
         localSnippets: [Snippet],
@@ -119,26 +119,24 @@ enum SnippetSyncMerger {
 
 // MARK: - Generic entity merge
 
-private protocol SnippetSyncEntityRecord: Equatable {
+private protocol SnippetSyncEntityRecord: Equatable, Encodable {
     var id: UUID { get }
     var updatedAt: Int { get }
-    var canonicalContent: String { get }
+    var canonicalContent: Data { get }
 }
 
 extension SnippetSyncFolderRecord: SnippetSyncEntityRecord {
-    var canonicalContent: String {
-        [title, String(index), isEnabled ? "1" : "0"].map(canonicalComponent).joined()
-    }
+    var canonicalContent: Data { canonicalData(self) }
 }
 
 extension SnippetSyncSnippetRecord: SnippetSyncEntityRecord {
-    var canonicalContent: String {
-        [folderID.uuidString, title, content, String(index), isEnabled ? "1" : "0"].map(canonicalComponent).joined()
-    }
+    var canonicalContent: Data { canonicalData(self) }
 }
 
-private func canonicalComponent(_ value: String) -> String {
-    "\(value.utf8.count):\(value)"
+private func canonicalData<Record: Encodable>(_ record: Record) -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return try! encoder.encode(record)
 }
 
 private struct EntityMergeResult<Record> {
@@ -155,6 +153,28 @@ private struct MergeCandidate<Record> {
     let tombstone: SnippetSyncTombstone?
 }
 
+private func recordsByID<Record: SnippetSyncEntityRecord>(_ records: [Record]) -> [UUID: Record] {
+    records.reduce(into: [:]) { result, record in
+        guard let existing = result[record.id] else {
+            result[record.id] = record
+            return
+        }
+        if record.updatedAt > existing.updatedAt ||
+            (record.updatedAt == existing.updatedAt &&
+             existing.canonicalContent.lexicographicallyPrecedes(record.canonicalContent)) {
+            result[record.id] = record
+        }
+    }
+}
+
+private func tombstonesByID(_ tombstones: [SnippetSyncTombstone]) -> [UUID: SnippetSyncTombstone] {
+    tombstones.reduce(into: [:]) { result, tombstone in
+        if tombstone.deletedAt > (result[tombstone.id]?.deletedAt ?? Int.min) {
+            result[tombstone.id] = tombstone
+        }
+    }
+}
+
 /// Merges one entity type (folders, or snippets) by id: the version with the newest timestamp
 /// wins, whether that version is a live record or a tombstone. Ties prefer the live record, so a
 /// simultaneous edit and delete never destroys data by accident.
@@ -165,9 +185,9 @@ private func mergeEntities<Record: SnippetSyncEntityRecord>(
     remoteTombstones: [SnippetSyncTombstone],
     now: Int
 ) -> EntityMergeResult<Record> {
-    let localByID = Dictionary(uniqueKeysWithValues: local.map { ($0.id, $0) })
-    let remoteByID = Dictionary(uniqueKeysWithValues: remoteRecords.map { ($0.id, $0) })
-    let remoteTombstoneByID = Dictionary(uniqueKeysWithValues: remoteTombstones.map { ($0.id, $0) })
+    let localByID = recordsByID(local)
+    let remoteByID = recordsByID(remoteRecords)
+    let remoteTombstoneByID = tombstonesByID(remoteTombstones)
 
     // A local deletion is only detectable relative to a known prior baseline: an id this device
     // previously synced but no longer has locally. Without a baseline (first enable), nothing is
@@ -218,7 +238,7 @@ private func mergeEntities<Record: SnippetSyncEntityRecord>(
                 } else if !winner.isDeleted, !candidate.isDeleted,
                           let candidateRecord = candidate.record,
                           let winnerRecord = winner.record,
-                          candidateRecord.canonicalContent > winnerRecord.canonicalContent {
+                          winnerRecord.canonicalContent.lexicographicallyPrecedes(candidateRecord.canonicalContent) {
                     winner = candidate
                 }
             }

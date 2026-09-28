@@ -131,9 +131,9 @@ final class DatabaseMigrationTests {
             realm.add(folder)
         }
 
-        let before = Int(Date().timeIntervalSince1970)
+        let before = Int(Date().timeIntervalSince1970 * 1_000)
         migration.migrateFromRealmToSQLiteData()
-        let after = Int(Date().timeIntervalSince1970)
+        let after = Int(Date().timeIntervalSince1970 * 1_000)
 
         try database.read { database in
             let folders = try SnippetFolder.all.fetchAll(database)

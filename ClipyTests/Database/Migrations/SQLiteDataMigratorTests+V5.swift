@@ -29,7 +29,6 @@ extension SQLiteDataMigratorTests {
         try expectV2TableNames(database)
         try expectV2Triggers(database)
         try expectV5Tables(database)
-        try expectV5Indexes(database)
     }
 
     @Test
@@ -77,8 +76,8 @@ extension SQLiteDataMigratorTests {
                 as: Int.self
             )
             .fetchOne(database)
-            #expect((folderUpdatedAt ?? 0) > 0)
-            #expect((snippetUpdatedAt ?? 0) > 0)
+            #expect((folderUpdatedAt ?? 0) > 1_000_000_000_000)
+            #expect((snippetUpdatedAt ?? 0) > 1_000_000_000_000)
         }
     }
 
@@ -111,11 +110,4 @@ extension SQLiteDataMigratorTests {
         }
     }
 
-    func expectV5Indexes(_ database: DatabaseQueue) throws {
-        try database.read { database in
-            let indexNames = try indexes(database)
-            #expect(indexNames.contains("index_snippetFolders_on_updatedAt"))
-            #expect(indexNames.contains("index_snippets_on_updatedAt"))
-        }
-    }
 }
