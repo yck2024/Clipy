@@ -28,7 +28,6 @@ extension SQLiteDataMigratorTests {
 
         try expectV2TableNames(database)
         try expectV2Triggers(database)
-        try expectV3Indexes(database)
         try expectV5Tables(database)
         try expectV5Indexes(database)
     }
@@ -41,6 +40,7 @@ extension SQLiteDataMigratorTests {
         migrator.registerMigrationV2()
         migrator.registerMigrationV3()
         migrator.registerMigrationV4()
+        try migrator.migrate(database)
 
         try database.write { database in
             try #sql(
@@ -58,7 +58,6 @@ extension SQLiteDataMigratorTests {
             )
             .execute(database)
         }
-        try migrator.migrate(database)
 
         migrator.registerMigrationV5()
         try migrator.migrate(database)

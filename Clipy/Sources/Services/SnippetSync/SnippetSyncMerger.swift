@@ -134,6 +134,13 @@ private struct EntityMergeResult<Record> {
     var localDeletions: [UUID]
 }
 
+private struct MergeCandidate<Record> {
+    let timestamp: Int
+    let isDeleted: Bool
+    let record: Record?
+    let tombstone: SnippetSyncTombstone?
+}
+
 /// Merges one entity type (folders, or snippets) by id: the version with the newest timestamp
 /// wins, whether that version is a live record or a tombstone. Ties prefer the live record, so a
 /// simultaneous edit and delete never destroys data by accident.
@@ -170,26 +177,21 @@ private func mergeEntities<Record: SnippetSyncEntityRecord>(
     var localUpserts = [Record]()
     var localDeletions = [UUID]()
 
-    struct Candidate {
-        let timestamp: Int
-        let isDeleted: Bool
-        let record: Record?
-        let tombstone: SnippetSyncTombstone?
-    }
-
-    for id in allIDs {
-        var candidates = [Candidate]()
+    // Stable ordering keeps independently merged files byte-identical across Macs. Without it,
+    // differing Set iteration order can make file presenters rewrite each other's output forever.
+    for id in allIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
+        var candidates = [MergeCandidate<Record>]()
         if let record = localByID[id] {
-            candidates.append(Candidate(timestamp: record.updatedAt, isDeleted: false, record: record, tombstone: nil))
+            candidates.append(MergeCandidate(timestamp: record.updatedAt, isDeleted: false, record: record, tombstone: nil))
         }
         if let record = remoteByID[id] {
-            candidates.append(Candidate(timestamp: record.updatedAt, isDeleted: false, record: record, tombstone: nil))
+            candidates.append(MergeCandidate(timestamp: record.updatedAt, isDeleted: false, record: record, tombstone: nil))
         }
         if let tombstone = remoteTombstoneByID[id] {
-            candidates.append(Candidate(timestamp: tombstone.deletedAt, isDeleted: true, record: nil, tombstone: tombstone))
+            candidates.append(MergeCandidate(timestamp: tombstone.deletedAt, isDeleted: true, record: nil, tombstone: tombstone))
         }
         if let tombstone = localTombstoneByID[id] {
-            candidates.append(Candidate(timestamp: tombstone.deletedAt, isDeleted: true, record: nil, tombstone: tombstone))
+            candidates.append(MergeCandidate(timestamp: tombstone.deletedAt, isDeleted: true, record: nil, tombstone: tombstone))
         }
 
         var winner = candidates[0]

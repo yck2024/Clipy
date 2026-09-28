@@ -50,6 +50,31 @@ struct SnippetSyncMergerTests {
     }
 
     @Test
+    func mergeOrdersRecordsDeterministicallyRegardlessOfInputOrder() throws {
+        let first = folder(id: folderID, title: "First", updatedAt: 100)
+        let second = folder(id: otherFolderID, title: "Second", updatedAt: 100)
+        let forward = SnippetSyncMerger.plan(
+            localFolders: [first, second],
+            localSnippets: [],
+            previousLocalFolders: nil,
+            previousLocalSnippets: nil,
+            remote: .notFound,
+            now: 1_000
+        )
+        let backward = SnippetSyncMerger.plan(
+            localFolders: [second, first],
+            localSnippets: [],
+            previousLocalFolders: nil,
+            previousLocalSnippets: nil,
+            remote: .notFound,
+            now: 1_000
+        )
+
+        #expect(forward.fileToWrite == backward.fileToWrite)
+        #expect(try #require(forward.fileToWrite).folders.map(\.id) == [folderID.rawValue, otherFolderID.rawValue])
+    }
+
+    @Test
     func notFoundFileIsTreatedAsEmptyAndLocalStateIsWrittenOut() throws {
         let localFolder = folder(id: folderID, title: "Folder", updatedAt: 100)
 

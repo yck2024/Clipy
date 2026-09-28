@@ -35,7 +35,6 @@ final class SnippetSyncService {
     private var currentFolderURL: URL?
     private var previousLocalFolders: [SnippetFolder]?
     private var previousLocalSnippets: [Snippet]?
-    private var lastWrittenFile: SnippetSyncFile?
 
     @Shared(.isSnippetSyncEnabled)
     private var isSnippetSyncEnabled
@@ -80,7 +79,6 @@ private extension SnippetSyncService {
         // only adds records rather than risk inventing deletions.
         previousLocalFolders = nil
         previousLocalSnippets = nil
-        lastWrittenFile = nil
 
         localObservationCancellable = snippetRepository.observeFolderDetails()
             .dropFirst()
@@ -110,12 +108,13 @@ private extension SnippetSyncService {
         let localFolders = details.map(\.folder)
         let localSnippets = details.flatMap(\.snippets)
 
+        let remoteRead = fileStore.read(at: url)
         let plan = SnippetSyncMerger.plan(
             localFolders: localFolders,
             localSnippets: localSnippets,
             previousLocalFolders: previousLocalFolders,
             previousLocalSnippets: previousLocalSnippets,
-            remote: fileStore.read(at: url),
+            remote: remoteRead,
             now: Int(Date().timeIntervalSince1970)
         )
 
@@ -134,9 +133,19 @@ private extension SnippetSyncService {
             )
         }
 
-        if fileToWrite != lastWrittenFile {
-            fileStore.write(fileToWrite, to: url)
-            lastWrittenFile = fileToWrite
+        let needsWrite: Bool
+        switch remoteRead {
+        case .notFound:
+            needsWrite = true
+        case let .success(remoteFile):
+            needsWrite = remoteFile != fileToWrite
+        case .unreadable:
+            return
+        }
+        if needsWrite && !fileStore.write(fileToWrite, to: url) {
+            // Don't advance the baseline when a coordinated write fails: the next observation
+            // must retry instead of treating an unwritten change as synchronized.
+            return
         }
 
         previousLocalFolders = fileToWrite.folders.map(SnippetFolder.init)

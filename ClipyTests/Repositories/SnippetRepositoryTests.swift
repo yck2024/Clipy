@@ -12,6 +12,7 @@
 
 import Combine
 import DependenciesTestSupport
+import Foundation
 import SQLiteData
 import Testing
 @testable import Clipy
