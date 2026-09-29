@@ -22,9 +22,24 @@ struct SnippetSyncFileStore {
     static let fileName = "Clipy Snippets.json"
 
     private let fileCoordinator = NSFileCoordinator()
+    private let readOverride: ((URL) -> SnippetSyncRemoteReadResult)?
+
+    init(readOverride: ((URL) -> SnippetSyncRemoteReadResult)? = nil) {
+        self.readOverride = readOverride
+    }
 
     func read(at url: URL) -> SnippetSyncRemoteReadResult {
+        if let readOverride { return readOverride(url) }
+
         guard FileManager.default.fileExists(atPath: url.path) else {
+            // Older iCloud Drive layouts expose an undownloaded item as a hidden .icloud
+            // stub next to the intended URL. Never create a new sync file over that item.
+            let stubURL = url.deletingLastPathComponent()
+                .appendingPathComponent(".\(url.lastPathComponent).icloud")
+            if FileManager.default.fileExists(atPath: stubURL.path) || isUbiquitousItem(at: url) {
+                try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+                return .unreadable
+            }
             return .notFound
         }
 
@@ -40,6 +55,9 @@ struct SnippetSyncFileStore {
         }
 
         guard coordinationError == nil, let data else {
+            if isUbiquitousItem(at: url) {
+                try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+            }
             return .unreadable
         }
 
@@ -83,6 +101,10 @@ private extension SnippetSyncFileStore {
     /// there is no placeholder-download concern. Files synced by iCloud Drive or by a
     /// third-party File Provider extension (Google Drive, Dropbox, OneDrive, etc.) both report
     /// through this same resource value.
+    func isUbiquitousItem(at url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isUbiquitousItemKey]).isUbiquitousItem) == true
+    }
+
     func ubiquitousDownloadingStatus(of url: URL) -> URLUbiquitousItemDownloadingStatus? {
         guard let values = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]),
               let status = values.ubiquitousItemDownloadingStatus else {

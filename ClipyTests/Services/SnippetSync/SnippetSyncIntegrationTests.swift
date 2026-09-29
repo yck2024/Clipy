@@ -1,4 +1,5 @@
 import AppKit
+import CombineSchedulers
 import Dependencies
 import Foundation
 import SQLiteData
@@ -109,6 +110,106 @@ struct SnippetSyncIntegrationTests {
     }
 
     @Test
+    func unreadableFileMergesOnRetryWithoutFileChangeNotification() throws {
+        let setup = try SyncTestDevices()
+        defer { setup.cleanUp() }
+        let scheduler = DispatchQueue.test
+        let remote = SnippetSyncFile(
+            folders: [SnippetSyncFolderRecord(id: UUID(), title: "Cloud", index: 0, isEnabled: true, updatedAt: 100)],
+            snippets: [], deletedFolders: [], deletedSnippets: []
+        )
+        #expect(SnippetSyncFileStore().write(remote, to: setup.syncFileURL))
+        var reads = 0
+        setup.serviceB = withDependencies {
+            $0.snippetRepository = setup.repositoryB
+            $0.mainQueue = scheduler.eraseToAnyScheduler()
+        } operation: {
+            SnippetSyncService(fileStore: SnippetSyncFileStore(readOverride: { url in
+                reads += 1
+                return reads == 1 ? .unreadable : SnippetSyncFileStore().read(at: url)
+            }))
+        }
+
+        setup.serviceB.synchronizeForTesting(at: setup.shared)
+        #expect(setup.repositoryB.fetchFolderDetails().isEmpty)
+        scheduler.advance(by: .seconds(2))
+        #expect(reads == 2)
+        #expect(setup.repositoryB.fetchFolderDetails().map(\.folder.title) == ["Cloud"])
+        scheduler.advance(by: .seconds(60))
+        #expect(reads == 2)
+    }
+
+    @Test
+    func retryStopsOnDisable() throws {
+        let setup = try SyncTestDevices()
+        defer { setup.cleanUp() }
+        let scheduler = DispatchQueue.test
+        var reads = 0
+        setup.serviceB = withDependencies {
+            $0.snippetRepository = setup.repositoryB
+            $0.mainQueue = scheduler.eraseToAnyScheduler()
+        } operation: {
+            SnippetSyncService(fileStore: SnippetSyncFileStore(readOverride: { _ in
+                reads += 1
+                return .unreadable
+            }))
+        }
+
+        setup.serviceB.synchronizeForTesting(at: setup.shared)
+        #expect(reads == 1)
+        setup.serviceB.disableForTesting()
+        scheduler.advance(by: .seconds(60))
+        #expect(reads == 1)
+    }
+
+    @Test
+    func changingFoldersCancelsPendingRetry() throws {
+        let setup = try SyncTestDevices()
+        defer { setup.cleanUp() }
+        let scheduler = DispatchQueue.test
+        var oldFolderReads = 0
+        let otherFolder = setup.root.appending(path: "other", directoryHint: .isDirectory)
+        let originalFolder = setup.shared
+        setup.serviceB = withDependencies {
+            $0.snippetRepository = setup.repositoryB
+            $0.mainQueue = scheduler.eraseToAnyScheduler()
+        } operation: {
+            SnippetSyncService(fileStore: SnippetSyncFileStore(readOverride: { url in
+                if url.deletingLastPathComponent() == originalFolder {
+                    oldFolderReads += 1
+                    return .unreadable
+                }
+                return .notFound
+            }))
+        }
+
+        setup.serviceB.synchronizeForTesting(at: setup.shared)
+        setup.serviceB.synchronizeForTesting(at: otherFolder)
+        scheduler.advance(by: .seconds(60))
+        #expect(oldFolderReads == 1)
+    }
+
+    @Test
+    func icloudStubDoesNotCauseLocalOnlyOverwrite() throws {
+        let setup = try SyncTestDevices()
+        defer { setup.cleanUp() }
+        let stubURL = setup.shared.appendingPathComponent(".\(SnippetSyncFileStore.fileName).icloud")
+        try Data("placeholder".utf8).write(to: stubURL)
+        _ = setup.repositoryB.insertFolders([("Local", [("snippet", "local content")])])
+        let scheduler = DispatchQueue.test
+        setup.serviceB = withDependencies {
+            $0.snippetRepository = setup.repositoryB
+            $0.mainQueue = scheduler.eraseToAnyScheduler()
+        } operation: { SnippetSyncService() }
+
+        setup.serviceB.synchronizeForTesting(at: setup.shared)
+
+        #expect(!FileManager.default.fileExists(atPath: setup.syncFileURL.path))
+        #expect(try Data(contentsOf: stubURL) == Data("placeholder".utf8))
+        #expect(setup.repositoryB.fetchFolderDetails().map(\.folder.title) == ["Local"])
+    }
+
+    @Test
     func syncingLeavesClipboardHistoryRowsUnchanged() throws {
         let setup = try SyncTestDevices()
         defer { setup.cleanUp() }
@@ -137,7 +238,7 @@ private final class SyncTestDevices {
     let repositoryA: SnippetRepository
     let repositoryB: SnippetRepository
     let serviceA: SnippetSyncService
-    let serviceB: SnippetSyncService
+    var serviceB: SnippetSyncService
 
     var syncFileURL: URL { shared.appendingPathComponent(SnippetSyncFileStore.fileName) }
 
