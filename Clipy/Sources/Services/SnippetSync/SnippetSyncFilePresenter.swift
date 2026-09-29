@@ -12,10 +12,9 @@
 
 import Foundation
 
-/// Watches the shared sync file for changes made by other processes (Clipy on another Mac, or a
-/// cloud-storage provider finishing a download) via `NSFileCoordinator`'s presenter mechanism,
-/// which is the robust way to observe a coordinated document regardless of whether it's stored in
-/// iCloud Drive or in a third-party File Provider location such as Google Drive or Dropbox.
+/// Watches the shared sync file for coordinated changes made by other processes via
+/// `NSFileCoordinator`'s presenter mechanism. A cloud download finishing does not always
+/// produce a presenter callback, so the service also retries unreadable files independently.
 final class SnippetSyncFilePresenter: NSObject, NSFilePresenter {
     let presentedItemURL: URL?
     let presentedItemOperationQueue = OperationQueue()

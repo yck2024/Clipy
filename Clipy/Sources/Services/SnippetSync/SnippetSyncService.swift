@@ -10,6 +10,7 @@
 //  Copyright © 2015-2026 Clipy Project.
 //
 
+import AppKit
 import Combine
 import Dependencies
 import Foundation
@@ -31,6 +32,9 @@ final class SnippetSyncService {
     private var configurationCancellable: AnyCancellable?
     private var localObservationCancellable: AnyCancellable?
     private var syncTriggerCancellable: AnyCancellable?
+    private var activationCancellable: AnyCancellable?
+    private var retryCancellable: AnyCancellable?
+    private var retryAttempt = 0
     private let syncTrigger = PassthroughSubject<Void, Never>()
 
     private var currentFolderURL: URL?
@@ -47,8 +51,15 @@ final class SnippetSyncService {
     }
 
     func synchronizeForTesting(at folderURL: URL) {
-        currentFolderURL = folderURL
+        if currentFolderURL != folderURL {
+            cancelRetry()
+            currentFolderURL = folderURL
+        }
         syncNow()
+    }
+
+    func disableForTesting() {
+        reconfigure(isEnabled: false, folderPath: nil)
     }
 
     func start() {
@@ -56,6 +67,12 @@ final class SnippetSyncService {
             .debounce(for: .seconds(1), scheduler: mainQueue)
             .sink { [weak self] in
                 self?.syncNow()
+            }
+
+        activationCancellable = NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .receive(on: mainQueue)
+            .sink { [weak self] _ in
+                self?.syncTrigger.send(())
             }
 
         configurationCancellable = Publishers.CombineLatest(
@@ -75,6 +92,8 @@ final class SnippetSyncService {
 
 private extension SnippetSyncService {
     func reconfigure(isEnabled: Bool, folderPath: String?) {
+        // Reconfiguration invalidates a pending retry, even if the old folder is still downloading.
+        cancelRetry()
         stopWatching()
 
         guard isEnabled, let folderPath, !folderPath.isEmpty else {
@@ -115,6 +134,26 @@ private extension SnippetSyncService {
         synchronize(at: folderURL)
     }
 
+    func cancelRetry() {
+        retryCancellable = nil
+        retryAttempt = 0
+    }
+
+    func scheduleRetry() {
+        // A file presenter notification is not guaranteed when a cloud download completes.
+        // Keep one cancellable retry outstanding, with a capped delay while the folder stays active.
+        guard retryCancellable == nil else { return }
+        let delays = [2, 5, 15, 30]
+        let delay = delays[min(retryAttempt, delays.count - 1)]
+        retryAttempt += 1
+        retryCancellable = Just(())
+            .delay(for: .seconds(delay), scheduler: mainQueue)
+            .sink { [weak self] in
+                self?.retryCancellable = nil
+                self?.syncNow()
+            }
+    }
+
     func synchronize(at folderURL: URL) {
         let url = syncFileURL(in: folderURL)
 
@@ -132,8 +171,8 @@ private extension SnippetSyncService {
         )
 
         guard let fileToWrite = plan.fileToWrite else {
-            // Unreadable file: keep the existing baseline and local data untouched, and try
-            // again on the next local change or file-change notification.
+            // Keep the baseline and local data untouched until the shared file can be read.
+            scheduleRetry()
             return
         }
 
@@ -163,6 +202,7 @@ private extension SnippetSyncService {
 
         previousLocalFolders = fileToWrite.folders.map(SnippetFolder.init)
         previousLocalSnippets = fileToWrite.snippets.map(Snippet.init)
+        cancelRetry()
     }
 
     func syncFileURL(in folderURL: URL) -> URL {
